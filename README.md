@@ -1,6 +1,6 @@
 # AI-Plagiarism-Checker
 
-## CopyCatch®
+## CopyCatch® — AI Plagiarism Checker
 
 CopyCatch is a React/Vite frontend connected to the supplied Spring Boot and MongoDB backend. The UI keeps the existing monochrome, full-screen video login style and extends its typography, rounded controls, and spacing into the workspace.
 
