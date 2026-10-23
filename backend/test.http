@@ -1,0 +1,21 @@
+### Create test user
+POST http://localhost:8080/api/test/user
+Content-Type: application/json
+### Register new user
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Geethika",
+  "email": "geethika2@gmail.com",
+  "password": "hello123",
+  "role": "STUDENT"
+}
+### Login existing user
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "geethika@gmail.com",
+  "password": "hello123"
+}

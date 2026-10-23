@@ -1,0 +1,433 @@
+# Code Plagiarism / Similarity Checker for Code Assignments
+
+## 1. Project Overview
+
+The **Code Plagiarism / Similarity Checker for Code Assignments** is a web application that helps teachers compare programming assignments submitted by students and identify potentially similar source code.
+
+Students can submit their code files, teachers can manage assignments and run similarity analysis, and the system presents pairwise similarity scores and reports. Similarity scores are indicators for review—not definitive proof of plagiarism.
+
+## 2. Problem Statement
+
+Manual comparison of programming assignments is time-consuming and becomes difficult when many students submit solutions to the same problem. Simple text comparison can also miss similarities when students change whitespace, comments, formatting, or variable names.
+
+The proposed system provides a centralized platform to collect code submissions, compare them using code-normalization and similarity algorithms, and show teachers which submissions may deserve closer inspection.
+
+## 3. Objectives
+
+- Provide a web interface for students and teachers.
+- Allow teachers to create and manage programming assignments.
+- Allow students to upload source-code submissions.
+- Store users, assignments, submissions, and analysis results in MongoDB.
+- Normalize source code to reduce the effect of formatting differences.
+- Compare submissions using token-based similarity measures.
+- Display similarity percentages, risk categories, and reports.
+- Keep a record of important system actions for auditing.
+- Build the backend using Java and Spring Boot, exposing REST APIs to the existing HTML/CSS/JavaScript frontend.
+
+## 4. Proposed Technology Stack
+
+| Component | Technology |
+|---|---|
+| Frontend | Existing Claude-generated HTML, CSS, and JavaScript |
+| Backend language | Java 17 or 21 |
+| Backend framework | Spring Boot |
+| API | Spring Web / REST |
+| Database | MongoDB |
+| Database integration | Spring Data MongoDB |
+| Build tool | Maven |
+| Validation | Jakarta Bean Validation |
+| Security | Spring Security, BCrypt password hashing, and a suitable session or token-based authentication design |
+| Testing | Postman and JUnit |
+| IDE | Eclipse or IntelliJ IDEA |
+| Version control | Git and GitHub |
+
+## 5. User Roles
+
+### 5.1 Student
+
+- Register and log in.
+- View available assignments.
+- Upload source-code files for an assignment.
+- View submission status.
+- View results if the application’s access policy allows students to see them.
+
+### 5.2 Teacher
+
+- Log in.
+- Create, view, update, and manage assignments.
+- View submissions for assignments they own.
+- Run similarity analysis across submissions.
+- View matched submission pairs and reports.
+
+### 5.3 Administrator (optional)
+
+- Manage users and system configuration.
+- Review audit logs.
+- Support administrative operations.
+
+Role assignment must be controlled by the backend. Users must not be able to grant themselves teacher or administrator privileges.
+
+## 6. Functional Requirements
+
+### 6.1 Authentication and Authorization
+
+- Register and log in users.
+- Store passwords as secure hashes, never as plaintext.
+- Restrict protected APIs according to user roles.
+- Validate ownership before teachers access or modify assignments and results.
+
+### 6.2 Assignment Management
+
+Teachers should be able to create assignments with fields such as:
+
+- Title
+- Description
+- Programming language
+- Deadline
+- Similarity review threshold
+- Teacher/creator ID
+- Creation timestamp
+
+### 6.3 Code Submission
+
+Students should be able to upload source-code files, initially focusing on `.java` files.
+
+The backend should:
+
+1. Validate the file type and size.
+2. Confirm that the assignment exists and is available for submission.
+3. Associate the submission with the authenticated student and assignment.
+4. Record the filename, submission timestamp, and processing status.
+5. Store the source code as text or store the file separately and save its reference in MongoDB.
+
+### 6.4 Similarity Detection
+
+The analysis pipeline should:
+
+1. Retrieve submissions belonging to the same assignment.
+2. Remove comments carefully without damaging string literals.
+3. Normalize whitespace and formatting.
+4. Tokenize Java source code.
+5. Optionally normalize identifiers to detect simple variable-renaming changes.
+6. Compare submissions using selected similarity algorithms.
+7. Calculate a similarity percentage.
+8. Classify results into configurable review categories.
+9. Save the results and return them to the frontend.
+
+**Important:** Similarity is a signal for human review, not a verdict. Common starter code, required templates, library imports, and short solutions can produce misleading scores. The system should avoid presenting a score as conclusive proof of misconduct.
+
+### 6.5 Results and Reports
+
+The system should display:
+
+- The two submissions being compared.
+- Their assignment and student references.
+- Token or other algorithm-specific similarity scores.
+- The final similarity score.
+- The configured review category.
+- The analysis timestamp.
+- Optionally, matched code regions or side-by-side code comparison.
+
+Teachers should be able to view a report summarizing submission counts and potentially high-similarity pairs for an assignment.
+
+### 6.6 Audit Logging
+
+Record important events such as assignment creation, submission upload, analysis execution, and report generation. Do not write passwords, authentication tokens, or other secrets to logs.
+
+## 7. Proposed MongoDB Collections
+
+The database name is `plagiarism_checker`.
+
+### 7.1 `users`
+
+Stores account information.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "name": "Rahul Kumar",
+  "email": "rahul@example.com",
+  "passwordHash": "<bcrypt-hash>",
+  "role": "STUDENT",
+  "createdAt": "2026-10-21T10:30:00Z"
+}
+```
+
+Suggested fields:
+
+- `_id`: MongoDB document ID
+- `name`: string, required
+- `email`: string, required and unique
+- `passwordHash`: string, required
+- `role`: enum such as `STUDENT`, `TEACHER`, or `ADMIN`
+- `createdAt`: date/time
+
+### 7.2 `assignments`
+
+Stores assignments created by teachers.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "title": "Java OOP Assignment",
+  "description": "Implement an employee management program.",
+  "language": "JAVA",
+  "deadline": "2026-11-25T23:59:00Z",
+  "teacherId": "ObjectId",
+  "similarityThreshold": 70,
+  "createdAt": "2026-10-21T11:00:00Z"
+}
+```
+
+### 7.3 `submissions`
+
+Stores submission metadata and, for a small college project, optionally the source code as text.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "assignmentId": "ObjectId",
+  "studentId": "ObjectId",
+  "fileName": "Employee.java",
+  "language": "JAVA",
+  "sourceCode": "public class Employee { /* example */ }",
+  "status": "UPLOADED",
+  "submittedAt": "2026-10-21T11:30:00Z"
+}
+```
+
+Suggested statuses include `UPLOADED`, `PROCESSING`, `ANALYZED`, and `FAILED`.
+
+For larger deployments, source files can be stored in dedicated file/object storage, with only a secure file reference and metadata in MongoDB.
+
+### 7.4 `similarity_results`
+
+Stores the comparison of two submissions.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "assignmentId": "ObjectId",
+  "submission1Id": "ObjectId",
+  "submission2Id": "ObjectId",
+  "tokenSimilarity": 84.5,
+  "jaccardSimilarity": 81.2,
+  "cosineSimilarity": 86.3,
+  "structuralSimilarity": null,
+  "finalSimilarity": 84.0,
+  "riskLevel": "HIGH",
+  "createdAt": "2026-10-21T12:00:00Z"
+}
+```
+
+The structural score may remain unavailable until a structural or AST-based comparison algorithm is implemented. Do not fabricate a score for an algorithm that has not been built.
+
+### 7.5 `reports`
+
+Stores generated assignment-level summaries.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "assignmentId": "ObjectId",
+  "totalSubmissions": 50,
+  "highRiskPairs": 6,
+  "mediumRiskPairs": 12,
+  "lowRiskPairs": 32,
+  "averageSimilarity": 31.7,
+  "generatedAt": "2026-10-21T12:30:00Z"
+}
+```
+
+Counts and categories must be calculated from actual analysis results. The example values are illustrative.
+
+### 7.6 `audit_logs`
+
+Stores important system events.
+
+Example document:
+
+```json
+{
+  "_id": "ObjectId",
+  "userId": "ObjectId",
+  "action": "PLAGIARISM_ANALYSIS_STARTED",
+  "assignmentId": "ObjectId",
+  "timestamp": "2026-10-21T12:00:00Z"
+}
+```
+
+## 8. Relationships Between Collections
+
+MongoDB documents can reference one another using their IDs:
+
+- A teacher/user can own many assignments.
+- An assignment can have many submissions.
+- A student can create many submissions.
+- A similarity result references two submissions and their assignment.
+- A report summarizes the results for one assignment.
+- Audit logs reference the user and relevant resource, where applicable.
+
+Conceptual flow:
+
+```text
+User (Teacher) ── creates ──> Assignment
+User (Student) ── uploads ──> Submission
+Assignment ── contains ──> Submissions
+Submission A ── compared with ── Submission B
+Comparison ── creates ──> Similarity Result
+Assignment Results ── summarized in ──> Report
+System Actions ── recorded in ──> Audit Logs
+```
+
+## 9. Proposed REST API Endpoints
+
+The exact endpoints should be checked against the existing frontend before implementation.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register an account |
+| `POST` | `/api/auth/login` | Authenticate a user |
+| `GET` | `/api/assignments` | List assignments the user is allowed to access |
+| `POST` | `/api/assignments` | Create an assignment (teacher) |
+| `GET` | `/api/assignments/{id}` | Get assignment details |
+| `PUT` | `/api/assignments/{id}` | Update an assignment (authorized teacher) |
+| `DELETE` | `/api/assignments/{id}` | Delete an assignment (authorized teacher) |
+| `POST` | `/api/submissions/upload` | Upload a source-code submission |
+| `GET` | `/api/submissions/{id}` | Get an authorized submission |
+| `GET` | `/api/assignments/{id}/submissions` | List submissions for an assignment |
+| `POST` | `/api/similarity/analyze/{assignmentId}` | Analyze submissions for an assignment |
+| `GET` | `/api/similarity/{submissionId}` | Retrieve relevant similarity results |
+| `GET` | `/api/reports/{assignmentId}` | Retrieve an assignment report |
+| `GET` | `/api/test` | Verify that the backend is running |
+
+All endpoints must validate authentication, role permissions, and resource ownership where relevant.
+
+## 10. System Architecture
+
+```text
+HTML / CSS / JavaScript Frontend
+                |
+                | HTTP requests and JSON responses
+                v
+       Java Spring Boot REST API
+                |
+       +--------+---------+
+       |        |         |
+       v        v         v
+ Controllers  Services  Validation/Security
+                |
+       +--------+---------+
+       |                  |
+       v                  v
+ MongoDB Repositories  Similarity Engine
+       |                  |
+       +--------+---------+
+                |
+                v
+             MongoDB
+```
+
+### Backend package structure
+
+```text
+com.plagiarism
+├── controller
+├── service
+├── repository
+├── model
+├── dto
+├── security
+├── similarity
+├── exception
+└── config
+```
+
+## 11. Similarity Algorithm Plan
+
+Implement the engine incrementally.
+
+### Phase 1: Baseline comparison
+
+- Exact source comparison.
+- Safe comment and whitespace normalization.
+- Tokenization of Java source.
+- Token-sequence similarity.
+
+### Phase 2: Additional metrics
+
+- Jaccard similarity over token sets or token shingles.
+- Cosine similarity over token-frequency vectors.
+- Identifier normalization, implemented carefully so keywords and literals are preserved.
+
+### Phase 3: Structural comparison
+
+- Parse Java source into an Abstract Syntax Tree (AST).
+- Compare structural features while accounting for renamed identifiers.
+- Optionally highlight similar code regions.
+
+If a weighted score is used, document its formula and validate it against test cases. A sample formula could be:
+
+`finalSimilarity = 0.5 × tokenSimilarity + 0.3 × structuralSimilarity + 0.2 × cosineSimilarity`
+
+Only use this formula once all required component scores are implemented. Keep weights configurable and ensure all scores use the same 0–100 scale.
+
+Risk categories (for example, LOW, MEDIUM, HIGH) should use configurable thresholds and be described as review priorities, not conclusions.
+
+## 12. Development Plan
+
+1. **Database design:** create the `plagiarism_checker` database and collections in MongoDB Compass.
+2. **Backend setup:** generate a Maven Spring Boot project with Spring Web, Spring Data MongoDB, and Validation.
+3. **Connection test:** configure MongoDB and implement `GET /api/test`.
+4. **Models and repositories:** implement Java classes matching the collections.
+5. **Authentication:** implement secure registration, login, password hashing, and role-based authorization.
+6. **Assignments:** implement assignment CRUD APIs.
+7. **Submissions:** implement validated `.java` file uploads and metadata storage.
+8. **Similarity engine:** implement and test normalization and comparison algorithms.
+9. **Analysis and reports:** compare submissions for the same assignment and persist results.
+10. **Frontend integration:** connect existing HTML/JavaScript actions to the REST endpoints.
+11. **Testing:** use Postman and JUnit, including edge cases and permission checks.
+12. **Deployment:** configure environment variables, secrets, database access, and production hosting.
+
+## 13. Testing Scenarios
+
+- Two identical source files should produce a very high similarity score.
+- Files differing only in whitespace or comments should remain highly similar.
+- Files with renamed variables but similar logic should be tested against identifier normalization.
+- Different implementations of the same assignment should not automatically be treated as plagiarism.
+- Empty, malformed, oversized, or unsupported files should be rejected safely.
+- A student must not upload a submission on behalf of another student.
+- A teacher must not access or alter another teacher's private assignments unless authorized.
+- Duplicate pairwise comparisons should not be stored repeatedly.
+- A failed analysis should be recorded with an appropriate status and error handling.
+
+## 14. Expected Outcome
+
+The completed application will provide a web-based workflow in which teachers create programming assignments, students upload source code, and the backend compares submissions and stores the results. Teachers can inspect similarity scores, review potentially matching code, and view assignment-level reports.
+
+The project demonstrates Java backend development, REST API design, MongoDB integration, authentication and authorization, file handling, algorithm implementation, testing, and frontend-backend integration.
+
+## 15. Scope and Limitations
+
+- Initial implementation focuses on Java source files.
+- Token similarity is a heuristic and may produce false positives or false negatives.
+- AST-based comparison is an advanced extension and must be implemented separately.
+- Similarity scores should support human review rather than automatically determine academic misconduct.
+- Production deployment requires secure secret management, upload limits, access controls, and appropriate retention policies.
+
+---
+
+**Project title:** Code Plagiarism / Similarity Checker for Code Assignments  
+**Backend:** Java + Spring Boot  
+**Database:** MongoDB  
+**Frontend:** Existing Claude-generated HTML/CSS/JavaScript  
